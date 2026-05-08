@@ -135,6 +135,7 @@ let highScores    = [];    // 前三高分（localStorage 持久化）
 
 // 静音按钮区域（右上角）
 const MUTE_BTN = { x: W - 50, y: 8, w: 42, h: 30 };
+const QUIT_BTN = { x: W / 2 - 80, y: H / 2 + 185, w: 160, h: 34 };
 
 // 背景两块面板的 Y 坐标（初始：面板1在顶部，面板2在其上方）
 let bgY1 = 0, bgY2 = -H;
@@ -626,9 +627,10 @@ function drawHUD() {
   // 积分（左上）
   ctx.save();
   ctx.font = 'bold 22px Arial, sans-serif';
+  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+  ctx.lineWidth = 3;
+  ctx.strokeText('积分: ' + score, 12, 32);
   ctx.fillStyle = '#fff';
-  ctx.shadowColor = '#000';
-  ctx.shadowBlur = 5;
   ctx.fillText('积分: ' + score, 12, 32);
   ctx.restore();
 
@@ -643,9 +645,10 @@ function drawHUD() {
   }
   ctx.save();
   ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+  ctx.lineWidth = 3;
+  ctx.strokeText('×' + player.bombs, W - 52, H - 28);
   ctx.fillStyle = '#fff';
-  ctx.shadowColor = '#000';
-  ctx.shadowBlur = 4;
   ctx.fillText('×' + player.bombs, W - 52, H - 28);
   ctx.restore();
 
@@ -654,8 +657,6 @@ function drawHUD() {
     ctx.save();
     ctx.font = 'bold 15px Arial, sans-serif';
     ctx.fillStyle = '#00eeff';
-    ctx.shadowColor = '#0066ff';
-    ctx.shadowBlur = 8;
     ctx.textAlign = 'center';
     ctx.fillText('◆ 火力升级中 ◆', W / 2, 32);
     ctx.textAlign = 'left';
@@ -715,6 +716,18 @@ function drawGameOver() {
     });
     ctx.restore();
   }
+
+  // 退出游戏按钮
+  ctx.save();
+  ctx.fillStyle = 'rgba(60,60,60,0.75)';
+  ctx.beginPath();
+  ctx.roundRect(QUIT_BTN.x, QUIT_BTN.y, QUIT_BTN.w, QUIT_BTN.h, 6);
+  ctx.fill();
+  ctx.font = 'bold 18px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#bbb';
+  ctx.fillText('退出游戏', W / 2, QUIT_BTN.y + 23);
+  ctx.restore();
 }
 
 // ============================================================
@@ -834,6 +847,7 @@ canvas.addEventListener('touchstart', e => {
   if (tx >= MUTE_BTN.x && tx <= MUTE_BTN.x + MUTE_BTN.w &&
       ty >= MUTE_BTN.y && ty <= MUTE_BTN.y + MUTE_BTN.h) {
     touchBlocked = true;
+    toggleMute();
     return;
   }
   touchBlocked = false;
@@ -871,25 +885,36 @@ canvas.addEventListener('click', e => {
     toggleMute();
     return;
   }
-  if (state === 'WAITING' || state === 'GAME_OVER') resetGame();
+  if (state === 'WAITING') { resetGame(); return; }
+  if (state === 'GAME_OVER') {
+    if (cx >= QUIT_BTN.x && cx <= QUIT_BTN.x + QUIT_BTN.w &&
+        cy >= QUIT_BTN.y && cy <= QUIT_BTN.y + QUIT_BTN.h) {
+      state = 'WAITING';
+    } else {
+      resetGame();
+    }
+  }
 });
 
 // 触摸结束 → 静音按钮 / 开始游戏 / 重开 / 双击炸弹
 canvas.addEventListener('touchend', e => {
   const now = Date.now();
-  if (e.changedTouches.length > 0) {
-    const rect = canvas.getBoundingClientRect();
-    const tx = (e.changedTouches[0].clientX - rect.left) * (W / rect.width);
-    const ty = (e.changedTouches[0].clientY - rect.top)  * (H / rect.height);
-    // 静音按钮优先（仅游戏中）
-    if (state === 'PLAYING' &&
-        tx >= MUTE_BTN.x && tx <= MUTE_BTN.x + MUTE_BTN.w &&
-        ty >= MUTE_BTN.y && ty <= MUTE_BTN.y + MUTE_BTN.h) {
-      toggleMute();
-      return;
+  const rect = canvas.getBoundingClientRect();
+  const tx = e.changedTouches.length > 0
+    ? (e.changedTouches[0].clientX - rect.left) * (W / rect.width) : -1;
+  const ty = e.changedTouches.length > 0
+    ? (e.changedTouches[0].clientY - rect.top)  * (H / rect.height) : -1;
+
+  if (state === 'WAITING') { resetGame(); return; }
+  if (state === 'GAME_OVER') {
+    if (tx >= QUIT_BTN.x && tx <= QUIT_BTN.x + QUIT_BTN.w &&
+        ty >= QUIT_BTN.y && ty <= QUIT_BTN.y + QUIT_BTN.h) {
+      state = 'WAITING';
+    } else {
+      resetGame();
     }
+    return;
   }
-  if (state === 'WAITING' || state === 'GAME_OVER') { resetGame(); return; }
   // 双击检测：两次 touchend 在 DOUBLE_TAP_MS 内
   if (now - lastTapTime < DOUBLE_TAP_MS) {
     useBomb();
